@@ -32,6 +32,7 @@ A hyperlocal delivery booking backend system implementing a complete logistics m
 - Logical condition-based order state progression
 - Manual state jump prevention with strict validation
 - Real-time courier movement towards pickup/drop locations
+- The movement simulation is intentionally lightweight and deterministic, implemented only to demonstrate logical state progression as required by the assignment.
 
 ## 🏗️ Architecture
 
