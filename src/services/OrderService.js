@@ -2,6 +2,7 @@ const store = require('../storage/InMemoryStore');
 const Order = require('../models/Order');
 const { AppError } = require('../middleware/errorHandler');
 const { canTransition, isTerminalState } = require('../utils/stateValidator');
+const ProgressionValidator = require('../utils/progressionValidator');
 const assignmentService = require('./AssignmentService');
 const courierService = require('./CourierService');
 
@@ -37,9 +38,25 @@ class OrderService {
         return order;
     }
 
-    async updateOrderState(orderId, newState) {
+    async updateOrderState(orderId, newState, isManualUpdate = true) {
         const order = this.getOrderById(orderId);
 
+        // For manual updates, validate that the transition is allowed
+        if (isManualUpdate) {
+            const courier = order.courierId ? store.getCourier(order.courierId) : null;
+            const manualValidation = ProgressionValidator.validateManualStateTransition(
+                order.state, 
+                newState, 
+                order, 
+                courier
+            );
+
+            if (!manualValidation.canTransition) {
+                throw new AppError(manualValidation.reason, 400);
+            }
+        }
+
+        // For automatic updates, check basic state transition rules
         if (!canTransition(order.state, newState)) {
             throw new AppError(
             `Invalid state transition: ${order.state} → ${newState}. Valid transitions from ${order.state}: ${require('../utils/stateValidator').getValidNextStates(order.state).join(', ')}`,
@@ -49,6 +66,16 @@ class OrderService {
 
         if (newState === 'PICKED_UP' && !order.courierId) {
             throw new AppError('Cannot mark as PICKED_UP: No courier assigned to this order', 400);
+        }
+
+        // For automatic progression, validate logical conditions
+        if (!isManualUpdate && newState !== 'CANCELLED') {
+            const courier = store.getCourier(order.courierId);
+            const progressionValidation = ProgressionValidator.validateOrderProgression(order, courier);
+            
+            if (!progressionValidation.canProgress) {
+                throw new AppError(`Cannot progress to ${newState}: ${progressionValidation.reason}`, 400);
+            }
         }
 
         order.updateState(newState);
@@ -92,43 +119,52 @@ class OrderService {
 
             const courier = courierService.getCourierById(order.courierId);
 
+            // Validate if order can progress based on current conditions
+            const progressionValidation = ProgressionValidator.validateOrderProgression(order, courier);
+            
             let progressUpdate = {};
 
             switch (order.state) {
                 case 'ASSIGNED':
-                    const pickupMove = courierService.moveCourierTowards(
-                        courier.id,
-                        order.pickupLocation,
-                        0.01
-                    );
-        
-                if (pickupMove.reached) {
-                    await this.updateOrderState(order.id, 'PICKED_UP');
-                    progressUpdate = { message: 'Courier reached pickup location', state: 'PICKED_UP' };
-                } else {
-                    progressUpdate = { message: 'Courier moving towards pickup', location: pickupMove.location };
-                }
-                break;
+                    if (progressionValidation.canProgress) {
+                        await this.updateOrderState(order.id, 'PICKED_UP', false);
+                        progressUpdate = { message: 'Courier reached pickup location', state: 'PICKED_UP' };
+                    } else {
+                        // Move courier towards pickup
+                        const pickupMove = courierService.moveCourierTowards(
+                            courier.id,
+                            order.pickupLocation,
+                            0.01
+                        );
+                        progressUpdate = { 
+                            message: progressionValidation.reason || 'Courier moving towards pickup', 
+                            location: pickupMove.location 
+                        };
+                    }
+                    break;
 
                 case 'PICKED_UP':
-                    await this.updateOrderState(order.id, 'IN_TRANSIT');
+                    await this.updateOrderState(order.id, 'IN_TRANSIT', false);
                     progressUpdate = { message: 'Package picked up, now in transit', state: 'IN_TRANSIT' };
                     break;
 
                 case 'IN_TRANSIT':
-                const dropMove = courierService.moveCourierTowards(
-                    courier.id,
-                    order.dropLocation,
-                    0.01
-                );
-        
-                if (dropMove.reached) {
-                    await this.updateOrderState(order.id, 'DELIVERED');
-                    progressUpdate = { message: 'Order delivered successfully!', state: 'DELIVERED' };
-                } else {
-                    progressUpdate = { message: 'Courier moving towards drop location', location: dropMove.location };
-                }
-                break;
+                    if (progressionValidation.canProgress) {
+                        await this.updateOrderState(order.id, 'DELIVERED', false);
+                        progressUpdate = { message: 'Order delivered successfully!', state: 'DELIVERED' };
+                    } else {
+                        // Move courier towards drop location
+                        const dropMove = courierService.moveCourierTowards(
+                            courier.id,
+                            order.dropLocation,
+                            0.01
+                        );
+                        progressUpdate = { 
+                            message: progressionValidation.reason || 'Courier moving towards drop location', 
+                            location: dropMove.location 
+                        };
+                    }
+                    break;
 
                 case 'DELIVERED':
                 case 'CANCELLED':

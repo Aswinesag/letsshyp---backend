@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { errorHandler } = require('./middleware/errorHandler');
 const apiRoutes = require('./routes');
+const movementSimulationService = require('./services/MovementSimulationService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,7 +27,8 @@ app.get('/', (req, res) => {
             health: '/api/health',
             stats: '/api/stats',
             orders: '/api/orders',
-            couriers: '/api/couriers'
+            couriers: '/api/couriers',
+            simulation: '/api/simulation'
         }
     });
 });
@@ -46,7 +48,7 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log('\n========================================');
     console.log(' Let\'s Shyp Backend Server Started');
     console.log('========================================');
@@ -67,7 +69,33 @@ app.listen(PORT, () => {
     console.log('     GET    /api/couriers/:id - Get courier by ID');
     console.log('     PATCH  /api/couriers/:id/location - Update location');
     console.log('     POST   /api/couriers/:id/move - Move courier');
+    console.log('\n   Simulation:');
+    console.log('     POST   /api/simulation/start - Start movement simulation');
+    console.log('     POST   /api/simulation/stop - Stop movement simulation');
+    console.log('     GET    /api/simulation/status - Get simulation status');
+    console.log('     PATCH  /api/simulation/speed - Set simulation speed');
+    console.log('     PATCH  /api/simulation/step-size - Set movement step size');
+    console.log('     POST   /api/simulation/orders/:id/force-progress - Force order progression');
     console.log('========================================\n');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('\n🔄 SIGTERM received, shutting down gracefully...');
+    movementSimulationService.stopSimulation();
+    server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('\n🔄 SIGINT received, shutting down gracefully...');
+    movementSimulationService.stopSimulation();
+    server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+    });
 });
 
 module.exports = app;
