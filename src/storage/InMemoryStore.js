@@ -1,3 +1,5 @@
+const Courier = require('../models/Courier');
+
 class InMemoryStore {
     constructor() {
         this.orders = new Map();
@@ -11,83 +13,83 @@ class InMemoryStore {
         const initialCouriers = [
         {
             id: 'COU_001',
-            name: 'Aswin Kumar',
-            currentLocation: { lat: 19.0760, lng: 72.8777 }, // Mumbai Central
+            name: 'Raj Kumar',
+            currentLocation: { lat: 19.0760, lng: 72.8777 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_002',
-            name: 'Anil Kumar',
-            currentLocation: { lat: 19.0896, lng: 72.8656 }, // Bandra
+            name: 'Priya Singh',
+            currentLocation: { lat: 19.0896, lng: 72.8656 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_003',
-            name: 'Santhi Anil',
-            currentLocation: { lat: 19.1136, lng: 72.8697 }, // Andheri
+            name: 'Amit Sharma',
+            currentLocation: { lat: 19.1136, lng: 72.8697 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_004',
-            name: 'Tejas Nair',
-            currentLocation: { lat: 19.0330, lng: 72.8569 }, // Worli
+            name: 'Sneha Patel',
+            currentLocation: { lat: 19.0330, lng: 72.8569 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_005',
-            name: 'John Doe',
-            currentLocation: { lat: 19.0176, lng: 72.8561 }, // Lower Parel
+            name: 'Vikram Rao',
+            currentLocation: { lat: 19.0176, lng: 72.8561 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_006',
-            name: 'Mike Tyson',
-            currentLocation: { lat: 19.0728, lng: 72.8826 }, // Dadar
+            name: 'Neha Desai',
+            currentLocation: { lat: 19.0728, lng: 72.8826 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_007',
-            name: 'Arjun Reddy',
-            currentLocation: { lat: 19.1197, lng: 72.9046 }, // Powai
+            name: 'Arjun Mehta',
+            currentLocation: { lat: 19.1197, lng: 72.9046 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_008',
             name: 'Kavita Joshi',
-            currentLocation: { lat: 19.0522, lng: 72.8820 }, // Parel
+            currentLocation: { lat: 19.0522, lng: 72.8820 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_009',
             name: 'Rohit Nair',
-            currentLocation: { lat: 18.9894, lng: 72.8360 }, // Colaba
+            currentLocation: { lat: 18.9894, lng: 72.8360 },
             isAvailable: true,
             currentOrderId: null
         },
         {
             id: 'COU_010',
             name: 'Anjali Verma',
-            currentLocation: { lat: 19.0544, lng: 72.8320 }, // Breach Candy
+            currentLocation: { lat: 19.0544, lng: 72.8320 },
             isAvailable: true,
             currentOrderId: null
         }
-    ];
+        ];
 
-    initialCouriers.forEach(courier => {
-        this.couriers.set(courier.id, courier);
-    });
+        initialCouriers.forEach(courierData => {
+            const courier = new Courier(courierData);
+            this.couriers.set(courier.id, courier);
+        });
 
-    console.log(`Initialized ${this.couriers.size} couriers`);
+        console.log(`Initialized ${this.couriers.size} couriers`);
     }
-
 
     async acquireLock() {
         while (this.assignmentLock) {
@@ -99,7 +101,6 @@ class InMemoryStore {
     releaseLock() {
         this.assignmentLock = false;
     }
-
 
     saveOrder(order) {
         this.orders.set(order.id, order);
@@ -153,7 +154,9 @@ class InMemoryStore {
             totalOrders: this.orders.size,
             totalCouriers: this.couriers.size,
             availableCouriers: this.getAvailableCouriers().length,
-            ordersInProgress: Array.from(this.orders.values()).filter(o => !['DELIVERED', 'CANCELLED'].includes(o.state)).length
+            ordersInProgress: Array.from(this.orders.values()).filter(
+            o => !['DELIVERED', 'CANCELLED'].includes(o.state)
+            ).length
         };
     }
 }
