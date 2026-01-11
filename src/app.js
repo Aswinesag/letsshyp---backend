@@ -8,6 +8,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+const { calculateManhattanDistance, EXPRESS_MAX_DISTANCE_KM } = require('./utils/distanceCalculator');
+const { canTransition, getValidNextStates } = require('./utils/stateValidator');
+const { errorHandler } = require('./middleware/errorHandler');
+
+
 app.get('/', (req, res) => {
     res.json({
         message: 'Let\'s Shyp Backend API',
@@ -26,17 +31,27 @@ app.get('/api/test/couriers', (req, res) => {
     });
 });
 
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(err.status || 500).json({
-        error: err.message || 'Internal Server Error',
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+app.get('/api/test/utils', (req, res) => {
+    const loc1 = { lat: 19.0760, lng: 72.8777 };
+    const loc2 = { lat: 19.0896, lng: 72.8656 };
+
+    res.json({
+        distanceCalculator: {
+            location1: loc1,
+            location2: loc2,
+            distance: calculateManhattanDistance(loc1, loc2),
+            expressMaxDistance: EXPRESS_MAX_DISTANCE_KM
+        },
+        stateValidator: {
+            canTransitionCreatedToAssigned: canTransition('CREATED', 'ASSIGNED'),
+            canTransitionCreatedToDelivered: canTransition('CREATED', 'DELIVERED'),
+            validNextStatesFromCreated: getValidNextStates('CREATED'),
+            validNextStatesFromAssigned: getValidNextStates('ASSIGNED')
+    }
     });
 });
 
-app.use((req, res) => {
-    res.status(404).json({ error: 'Route not found' });
-});
+app.use(errorHandler);
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
